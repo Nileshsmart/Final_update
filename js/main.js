@@ -1525,17 +1525,18 @@ window.addEventListener('load', () => {
     const total      = cards.length;
 
     // Clone each card once so we have 14 total — fills the full 360° with no blank gap
-    // Clones use lightweight GIFs so we don't double video decoders
+    // Clones use lightweight JPG posters to avoid loading 2.5MB+ of uncompressed GIFs
     cards.forEach((card) => {
       const clone = card.cloneNode(true);
       clone.setAttribute('aria-hidden', 'true');
       clone.style.pointerEvents = 'none';
       clone.querySelectorAll('video').forEach((v) => {
+        const poster = v.getAttribute('poster') || '';
         const src = v.getAttribute('src') || '';
-        const gifSrc = src.replace(/\.mp4$/i, '.gif');
+        const jpgSrc = poster || src.replace(/\.mp4(#.*)?$/i, '.jpg');
         const img = document.createElement('img');
         img.className = 'card-thumb';
-        img.src = gifSrc || src;
+        img.src = jpgSrc;
         img.alt = '';
         img.decoding = 'async';
         img.loading = 'lazy';
@@ -2378,9 +2379,6 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        if (video.readyState < 2) {
-          try { video.load(); } catch (e) {}
-        }
         var p = video.play();
         if (p && typeof p.catch === 'function') {
           p.catch(function() {
@@ -2427,7 +2425,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Autoplay local videos only while near viewport (keeps mobile smooth) ──
   window.initAutoplayVideos = function(container) {
     var root = container || document;
-    var videos = root.querySelectorAll('.proj-video, .card-gif-video, .insta-reel-video, video');
+    var videos = root.querySelectorAll('.proj-video, .card-gif-video, .insta-reel-video');
     if (!videos.length) return;
 
     function prep(v) {
@@ -2457,23 +2455,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     videos.forEach(function(v) {
       prep(v);
-      tryPlay(v);
-
-      v.addEventListener('loadedmetadata', function() { tryPlay(v); }, { once: true });
-      v.addEventListener('loadeddata', function() { tryPlay(v); }, { once: true });
-      v.addEventListener('canplay', function() { tryPlay(v); }, { once: true });
     });
 
-    if (!('IntersectionObserver' in window)) return;
+    if (!('IntersectionObserver' in window)) {
+      videos.forEach(function(v) { tryPlay(v); });
+      return;
+    }
 
     var io = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
         var v = entry.target;
         if (entry.isIntersecting) {
           tryPlay(v);
+        } else if (!v.paused) {
+          v.pause();
         }
       });
-    }, { rootMargin: '600px 0px', threshold: 0.001 });
+    }, { rootMargin: '300px 0px', threshold: 0.001 });
 
     videos.forEach(function(v) {
       io.observe(v);
